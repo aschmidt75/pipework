@@ -221,7 +221,14 @@ ip netns exec $NSPID ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
 if [ "$IPADDR" = "dhcp" ]
 then
     [ $DHCP_CLIENT = "udhcpc"  ] && ip netns exec $NSPID $DHCP_CLIENT -qi $CONTAINER_IFNAME -x hostname:$GUESTNAME
-    [ $DHCP_CLIENT = "dhclient"  ] && ip netns exec $NSPID $DHCP_CLIENT $CONTAINER_IFNAME -H $GUESTNAME
+    if [ $DHCP_CLIENT = "dhclient"  ]
+    then
+        HOST_PARAM="-H $GUESTNAME"
+        # dhclient 4.2.4 or earlier does not understand -H, so remove it from call after checking its version.
+        VER_NUM=$($DHCP_CLIENT --version 2>&1 | sed -e 's/.*\-\([0-9\.]*\)/\1/g' | tr -d '.')
+        [ $VER_NUM -le 424 ] && HOST_PARAM=
+        ip netns exec $NSPID $DHCP_CLIENT $CONTAINER_IFNAME $HOST_PARAM
+    fi
     [ $DHCP_CLIENT = "dhcpcd"  ] && ip netns exec $NSPID $DHCP_CLIENT -q $CONTAINER_IFNAME -h $GUESTNAME
 else
     ip netns exec $NSPID ip addr add $IPADDR dev $CONTAINER_IFNAME
